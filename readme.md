@@ -145,21 +145,45 @@ npm run build
 
 ### Configuration
 
+#### Create a Personal Access Token
+
+The server authenticates with a **Personal Access Token (PAT)**, a key that starts with `ck_pat_`. Never put your account password in an MCP config: a PAT carries only the scopes you give it, and you can revoke it without touching your login.
+
+Create one from a terminal. Your password is used once, to get a short-lived session token, and is never stored:
+
+```bash
+# 1. Get a session token (typed once, not saved anywhere)
+curl -s https://api.cakemail.dev/token \
+  -H 'Content-Type: application/x-www-form-urlencoded' \
+  --data-urlencode grant_type=password \
+  --data-urlencode username=you@example.com \
+  --data-urlencode 'password=…'
+
+# 2. Create a PAT with that session token
+curl -s https://api.cakemail.dev/users/self/pats \
+  -H 'Authorization: Bearer <access_token from step 1>' \
+  -H 'Content-Type: application/json' \
+  -d '{"name": "cakemail-mcp-server", "scopes": ["emailapi:send"]}'
+```
+
+The `plaintext` field of the response is your `ck_pat_…` key. It is shown **once**; copy it now.
+
+- **Scope:** `emailapi:send` is what sending needs (it also grants `emailapi:read`). A PAT reaches only what its scopes allow, so tools outside those scopes (campaigns, lists, contacts, reports) are refused by the API until you create a PAT with the matching scopes.
+- **Revoke:** `DELETE /users/self/pats/{key_prefix}`, called with a session token from step 1.
+
 #### Environment Variables
 
 Create a `.env` file in the project root:
 
 ```env
-CAKEMAIL_USERNAME=your-email@example.com
-CAKEMAIL_PASSWORD=your-password
-CAKEMAIL_BASE_URL=https://api.cakemail.dev
+CAKEMAIL_API_KEY=ck_pat_your-personal-access-token
 ```
 
 #### Claude Desktop Setup
 
 Add the server to your Claude Desktop configuration:
 
-**macOS:** `~/Library/Application Support/Claude/claude_desktop_config.json`  
+**macOS:** `~/Library/Application Support/Claude/claude_desktop_config.json`
 **Windows:** `%APPDATA%\Claude\claude_desktop_config.json`
 
 ```json
@@ -169,13 +193,14 @@ Add the server to your Claude Desktop configuration:
       "command": "node",
       "args": ["/absolute/path/to/cakemail-mcp-server/build/index.js"],
       "env": {
-        "CAKEMAIL_USERNAME": "your-email@example.com",
-        "CAKEMAIL_PASSWORD": "your-password"
+        "CAKEMAIL_API_KEY": "ck_pat_your-personal-access-token"
       }
     }
   }
 }
 ```
+
+The server sends the key as `Authorization: Bearer ck_pat_…` to `https://api.cakemail.dev`.
 
 ## 🧪 Testing
 
@@ -333,7 +358,9 @@ Comprehensive error types with detailed messages:
 ### Common Issues
 
 **Authentication Errors:**
-- Verify `CAKEMAIL_USERNAME` and `CAKEMAIL_PASSWORD`
+- Verify `CAKEMAIL_API_KEY` holds the full `ck_pat_…` key
+- A `401` means the key was revoked or is no longer valid: create a new PAT (PATs are in beta, and existing keys may be revoked if the scope model changes)
+- A refusal on one tool but not another means the PAT lacks that tool's scope
 - Ensure API access is enabled on your account
 
 **Build Errors:**
@@ -358,7 +385,7 @@ DEBUG=mcp:* npm start
 
 ## 🔐 Security
 
-- **OAuth 2.0** authentication with automatic token refresh
+- **Personal Access Token** authentication: scoped, revocable, and no account password in your config
 - **Input validation** to prevent injection attacks
 - **Secure credential storage** using environment variables
 - **Rate limiting** to prevent abuse
@@ -371,7 +398,7 @@ DEBUG=mcp:* npm start
 1. Copy `.env.example` to `.env`
 2. Add your actual credentials to `.env`
 3. Ensure `.env` is listed in `.gitignore` (already configured)
-4. If credentials are accidentally exposed, rotate them immediately in your Cakemail account
+4. If a key is accidentally exposed, revoke it (`DELETE /users/self/pats/{key_prefix}`) and create a new one
 
 ## 📚 Support
 

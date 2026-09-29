@@ -9,6 +9,7 @@ import { CakemailAPI } from './cakemail-api.js';
 import { allTools } from './config/tools.js';
 import { handleToolCall } from './handlers/index.js';
 import logger from './utils/logger.js';
+import { resolveCredentials, CakemailCredentials } from './utils/credentials.js';
 
 const server = new Server(
   {
@@ -23,17 +24,16 @@ const server = new Server(
 );
 
 // Initialize API
-const email = process.env.CAKEMAIL_EMAIL;
-const password = process.env.CAKEMAIL_PASSWORD;
-
-if (!email || !password) {
-  console.error('CAKEMAIL_EMAIL and CAKEMAIL_PASSWORD environment variables are required');
+let credentials: CakemailCredentials;
+try {
+  credentials = resolveCredentials(process.env);
+} catch (error) {
+  console.error(error instanceof Error ? error.message : String(error));
   process.exit(1);
 }
 
-const api = new CakemailAPI({ 
-  email, 
-  password,
+const api = new CakemailAPI({
+  ...credentials,
   circuitBreaker: { 
     enabled: true,
     failureThreshold: 5,

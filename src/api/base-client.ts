@@ -90,6 +90,11 @@ export class BaseApiClient {
   }
 
   async authenticate(): Promise<void> {
+    // A PAT is already the bearer credential; there is nothing to exchange.
+    if (this.config.apiKey) {
+      return;
+    }
+
     const maxRetries = 3;
     let retryCount = 0;
     
@@ -129,6 +134,10 @@ export class BaseApiClient {
   }
 
   private async passwordAuthenticate(): Promise<void> {
+    if (!this.config.email || !this.config.password) {
+      throw new CakemailAuthenticationError('No credentials configured: set a PAT (apiKey) or email and password');
+    }
+
     const response = await fetch(`${this.baseUrl}/token`, {
       method: 'POST',
       headers: {
@@ -252,14 +261,14 @@ export class BaseApiClient {
   }
   
   private async executeRequest(endpoint: string, options: RequestInit = {}): Promise<any> {
-    // Use mock token in test environment if available
-    const token = this.mockToken || this.token;
-    if (!token) {
+    // Use mock token in test environment if available, then a PAT, then the password-grant token
+    const accessToken = this.mockToken?.access_token || this.config.apiKey || this.token?.access_token;
+    if (!accessToken) {
       throw new CakemailAuthenticationError('No authentication token available');
     }
 
     const headers: Record<string, string> = {
-      'Authorization': `Bearer ${token.access_token}`,
+      'Authorization': `Bearer ${accessToken}`,
       'Accept': 'application/json',
       'Content-Type': 'application/json'
     };
@@ -388,6 +397,19 @@ export class BaseApiClient {
     tokenType: string | null;
     hasRefreshToken: boolean;
   } {
+    // A PAT has no refresh token and no client-side expiry; a revoked or expired PAT surfaces as a 401
+    if (this.config.apiKey) {
+      return {
+        hasToken: true,
+        isExpired: false,
+        expiresAt: null,
+        timeUntilExpiry: null,
+        needsRefresh: false,
+        tokenType: 'Bearer',
+        hasRefreshToken: false
+      };
+    }
+
     const now = new Date();
     const hasToken = !!this.token?.access_token;
     const isExpired = this.tokenExpiry ? now >= this.tokenExpiry : !hasToken;
@@ -501,8 +523,8 @@ export class BaseApiClient {
 
   // Auto-refresh token before requests if needed
   protected async ensureValidToken(): Promise<void> {
-    // Skip token refresh in test environment if mock token is set
-    if (this.mockToken) {
+    // Skip token refresh in test environment if mock token is set, or when a PAT is the credential
+    if (this.mockToken || this.config.apiKey) {
       return;
     }
     

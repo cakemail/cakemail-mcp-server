@@ -45,7 +45,7 @@ export function handleCakemailError(error: unknown) {
     return {
       content: [{
         type: 'text',
-        text: `🔐 **Authentication Error**\n\n${error.message}\n\n**Please check your CAKEMAIL_EMAIL and CAKEMAIL_PASSWORD environment variables.**`
+        text: `🔐 **Authentication Error**\n\n${error.message}\n\n**Please check your CAKEMAIL_API_KEY environment variable (a Personal Access Token, ck_pat_…).**`
       }],
       isError: true
     };

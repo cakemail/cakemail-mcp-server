@@ -1,8 +1,11 @@
 // Shared TypeScript interfaces for Cakemail API
 
 export interface CakemailConfig {
-  email: string;
-  password: string;
+  // A Personal Access Token (ck_pat_…), sent as-is as the Bearer credential.
+  // When set, email/password are ignored and /token is never called.
+  apiKey?: string;
+  email?: string;
+  password?: string;
   baseUrl?: string;
   debug?: boolean;
 }
